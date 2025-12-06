@@ -12,10 +12,13 @@ const { Option } = Select;
 const Users = () => {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]); // Store all users for client-side filtering
   const [total, setTotal] = useState(0);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchText, setSearchText] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string | null>(null);
+  const [premiumFilter, setPremiumFilter] = useState<boolean | null>(null);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [form] = Form.useForm();
@@ -23,6 +26,11 @@ const Users = () => {
   useEffect(() => {
     fetchUsers();
   }, [pageNumber, pageSize]);
+
+  // Apply client-side filters when filter values change
+  useEffect(() => {
+    applyFilters();
+  }, [roleFilter, premiumFilter, searchText, allUsers]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -36,7 +44,7 @@ const Users = () => {
           },
         }
       );
-      setUsers(response.data.data.items);
+      setAllUsers(response.data.data.items);
       setTotal(response.data.data.totalCount);
     } catch (error: any) {
       message.error('Không thể tải danh sách người dùng');
@@ -44,6 +52,32 @@ const Users = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...allUsers];
+
+    // Apply role filter
+    if (roleFilter) {
+      filtered = filtered.filter(user => user.role === roleFilter);
+    }
+
+    // Apply premium filter
+    if (premiumFilter !== null) {
+      filtered = filtered.filter(user => user.ispremium === premiumFilter);
+    }
+
+    // Apply search filter
+    if (searchText) {
+      const searchLower = searchText.toLowerCase();
+      filtered = filtered.filter(user =>
+        user.fullname.toLowerCase().includes(searchLower) ||
+        user.email.toLowerCase().includes(searchLower) ||
+        user.userName.toLowerCase().includes(searchLower)
+      );
+    }
+
+    setUsers(filtered);
   };
 
   const handleEdit = (user: User) => {
@@ -136,11 +170,6 @@ const Users = () => {
       title: 'Họ tên',
       dataIndex: 'fullname',
       key: 'fullname',
-      filteredValue: searchText ? [searchText] : null,
-      onFilter: (value, record) =>
-        record.fullname.toLowerCase().includes(value.toString().toLowerCase()) ||
-        record.email.toLowerCase().includes(value.toString().toLowerCase()) ||
-        record.userName.toLowerCase().includes(value.toString().toLowerCase()),
     },
     {
       title: 'Email',
@@ -160,11 +189,6 @@ const Users = () => {
       render: (role: string) => (
         <Tag color={role === 'ADMIN' ? 'red' : 'blue'}>{role}</Tag>
       ),
-      filters: [
-        { text: 'Admin', value: 'ADMIN' },
-        { text: 'User', value: 'USER' },
-      ],
-      onFilter: (value, record) => record.role === value,
     },
     {
       title: 'Premium',
@@ -187,11 +211,6 @@ const Users = () => {
           </Tag>
         )
       ),
-      filters: [
-        { text: 'Premium', value: true },
-        { text: 'Free', value: false },
-      ],
-      onFilter: (value, record) => record.ispremium === value,
     },
     {
       title: 'Số điện thoại',
@@ -225,7 +244,7 @@ const Users = () => {
       <h1 style={{ marginBottom: 24 }}>Quản lý người dùng</h1>
       
       <Card>
-        <Space style={{ marginBottom: 16 }}>
+        <Space style={{ marginBottom: 16 }} wrap>
           <Input
             placeholder="Tìm kiếm theo tên, email, username..."
             prefix={<SearchOutlined />}
@@ -234,9 +253,39 @@ const Users = () => {
             style={{ width: 300 }}
             allowClear
           />
+          <Select
+            placeholder="Lọc theo vai trò"
+            style={{ width: 150 }}
+            allowClear
+            value={roleFilter}
+            onChange={(value) => {
+              setRoleFilter(value || null);
+            }}
+          >
+            <Option value="ADMIN">Admin</Option>
+            <Option value="USER">User</Option>
+          </Select>
+          <Select
+            placeholder="Lọc theo Premium"
+            style={{ width: 150 }}
+            allowClear
+            value={premiumFilter}
+            onChange={(value) => {
+              setPremiumFilter(value ?? null);
+            }}
+          >
+            <Option value={true}>Premium</Option>
+            <Option value={false}>Free</Option>
+          </Select>
           <Button
             icon={<ReloadOutlined />}
-            onClick={fetchUsers}
+            onClick={() => {
+              setRoleFilter(null);
+              setPremiumFilter(null);
+              setSearchText('');
+              setPageNumber(1);
+              fetchUsers();
+            }}
           >
             Làm mới
           </Button>
@@ -250,7 +299,7 @@ const Users = () => {
           pagination={{
             current: pageNumber,
             pageSize: pageSize,
-            total: total,
+            total: users.length,
             showSizeChanger: true,
             showTotal: (total) => `Tổng ${total} người dùng`,
             onChange: (page, size) => {
