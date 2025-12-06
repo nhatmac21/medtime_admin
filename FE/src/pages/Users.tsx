@@ -13,7 +13,6 @@ const Users = () => {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]); // Store all users for client-side filtering
-  const [total, setTotal] = useState(0);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchText, setSearchText] = useState('');
@@ -45,7 +44,6 @@ const Users = () => {
         }
       );
       setAllUsers(response.data.data.items);
-      setTotal(response.data.data.totalCount);
     } catch (error: any) {
       message.error('Không thể tải danh sách người dùng');
       console.error(error);
